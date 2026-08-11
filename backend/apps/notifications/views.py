@@ -1,84 +1,108 @@
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
-from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
-from django.utils import timezone
-from .models import Notification, NotificationPreference
-from .serializers import NotificationSerializer, NotificationPreferenceSerializer
+from rest_framework.response import Response
+from drf_spectacular.utils import extend_schema
+from django_filters.rest_framework import DjangoFilterBackend
+from rest_framework.filters import OrderingFilter
+from .models import Notification
+from .serializers import NotificationSerializer
 
 class NotificationViewSet(viewsets.ModelViewSet):
+    """ViewSet for notifications"""
     serializer_class = NotificationSerializer
     permission_classes = [IsAuthenticated]
+    filter_backends = [DjangoFilterBackend, OrderingFilter]
+    filterset_fields = ['is_read', 'notification_type']
+    ordering_fields = ['created_at']
+    ordering = ['-created_at']
     
     def get_queryset(self):
-        return Notification.objects.filter(user=self.request.user)
+        """Get notifications for current user"""
+        return Notification.objects.filter(recipient=self.request.user)
     
-    @action(detail=False, methods=['get'])
-    def unread(self, request):
-        """Get unread notifications"""
-        notifications = self.get_queryset().filter(is_read=False)
-        serializer = self.get_serializer(notifications, many=True)
-        return Response(serializer.data)
-    
+    @extend_schema(
+        description="Get unread notifications count",
+    )
     @action(detail=False, methods=['get'])
     def unread_count(self, request):
         """Get count of unread notifications"""
-        count = self.get_queryset().filter(is_read=False).count()
-        return Response({'unread_count': count})
+        count = Notification.objects.filter(
+            recipient=request.user,
+            is_read=False
+        ).count()
+        return Response({'unread_count': count}, status=status.HTTP_200_OK)
     
+    @extend_schema(
+        description="Mark a notification as read",
+    )
+    @action(detail=True, methods=['post'])
+    def mark_as_read(self, request, pk=None):
+        """Mark notification as read"""
+        notification = self.get_object()
+        notification.is_read = True
+        notification.save()
+        return Response(
+            {'message': 'Notification marked as read'},
+            status=status.HTTP_200_OK
+        )
+    
+    @extend_schema(
+        description="Mark all notifications as read",
+    )
     @action(detail=False, methods=['post'])
     def mark_all_as_read(self, request):
         """Mark all notifications as read"""
-        notifications = self.get_queryset().filter(is_read=False)
-        notifications.update(is_read=True, read_at=timezone.now())
+        Notification.objects.filter(
+            recipient=request.user,
+            is_read=False
+        ).update(is_read=True)
         return Response(
-            {'detail': 'All notifications marked as read.'},
+            {'message': 'All notifications marked as read'},
             status=status.HTTP_200_OK
         )
     
-    @action(detail=True, methods=['post'])
-    def mark_as_read(self, request, pk=None):
-        """Mark specific notification as read"""
+    @extend_schema(
+        description="Delete a notification",
+    )
+    @action(detail=True, methods=['delete'])
+    def delete_notification(self, request, pk=None):
+        """Delete a notification"""
         notification = self.get_object()
-        notification.is_read = True
-        notification.read_at = timezone.now()
-        notification.save()
+        notification.delete()
         return Response(
-            {'detail': 'Notification marked as read.'},
-            status=status.HTTP_200_OK
-        )
-    
-    @action(detail=False, methods=['delete'])
-    def delete_all(self, request):
-        """Delete all notifications"""
-        self.get_queryset().delete()
-        return Response(
-            {'detail': 'All notifications deleted.'},
+            {'message': 'Notification deleted'},
             status=status.HTTP_204_NO_CONTENT
         )
-
-class NotificationPreferenceViewSet(viewsets.ViewSet):
-    permission_classes = [IsAuthenticated]
     
-    def list(self, request):
-        """Get notification preferences for current user"""
-        try:
-            preference = request.user.notification_preference
-        except NotificationPreference.DoesNotExist:
-            preference = NotificationPreference.objects.create(user=request.user)
+    @extend_schema(
+        description="Get notifications by type",
+    )
+    @action(detail=False, methods=['get'])
+    def by_type(self, request):
+        """Get notifications filtered by type"""
+        notification_type = request.query_params.get('type')
+        if not notification_type:
+            return Response(
+                {'detail': 'type parameter is required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
         
-        serializer = NotificationPreferenceSerializer(preference)
-        return Response(serializer.data)
+        notifications = Notification.objects.filter(
+            recipient=request.user,
+            notification_type=notification_type
+        ).order_by('-created_at')
+        serializer = self.get_serializer(notifications, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
     
-    def update(self, request):
-        """Update notification preferences"""
-        try:
-            preference = request.user.notification_preference
-        except NotificationPreference.DoesNotExist:
-            preference = NotificationPreference.objects.create(user=request.user)
-        
-        serializer = NotificationPreferenceSerializer(preference, data=request.data, partial=True)
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data, status=status.HTTP_200_OK)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    @extend_schema(
+        description="Clear all notifications",
+    )
+    @action(detail=False, methods=['post'])
+    def clear_all(self, request):
+        """Clear all notifications for user"""
+        count = Notification.objects.filter(recipient=request.user).delete()[0]
+        return Response(
+            {'message': f'{count} notifications deleted'},
+            status=status.HTTP_200_OK
+        )
