@@ -1,56 +1,35 @@
 from rest_framework import serializers
-from apps.medical_records.models import MedicalRecord, LabResult, Diagnosis
-from apps.prescriptions.models import Prescription, Medication, PharmacyOrder
-
-class LabResultSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = LabResult
-        fields = ['id', 'test_name', 'test_code', 'result_value', 'normal_range', 
-                  'unit', 'status']
-
-class DiagnosisSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Diagnosis
-        fields = ['id', 'disease_name', 'icd_code', 'severity', 'onset_date', 'status']
+from .models import MedicalRecord
 
 class MedicalRecordSerializer(serializers.ModelSerializer):
+    patient_name = serializers.CharField(source='patient.get_full_name', read_only=True)
     doctor_name = serializers.CharField(source='doctor.get_full_name', read_only=True)
-    lab_result = LabResultSerializer(read_only=True)
-    diagnosis = DiagnosisSerializer(read_only=True)
+    doctor_email = serializers.CharField(source='doctor.email', read_only=True)
+    file_url = serializers.SerializerMethodField()
     
     class Meta:
         model = MedicalRecord
-        fields = ['id', 'patient', 'doctor', 'doctor_name', 'record_type', 'title',
-                  'description', 'findings', 'recommendations', 'record_date',
-                  'document', 'is_verified', 'lab_result', 'diagnosis', 'created_at', 'updated_at']
-        read_only_fields = ['created_at', 'updated_at']
-
-class MedicationSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Medication
-        fields = ['id', 'drug_name', 'strength', 'dosage_form', 'quantity', 'frequency',
-                  'duration_days', 'route', 'instructions', 'side_effects',
-                  'contraindications', 'created_at']
-        read_only_fields = ['created_at']
-
-class PrescriptionSerializer(serializers.ModelSerializer):
-    doctor_name = serializers.CharField(source='doctor.get_full_name', read_only=True)
-    medications = MedicationSerializer(many=True, read_only=True)
+        fields = [
+            'id', 'patient', 'patient_name', 'doctor', 'doctor_name', 'doctor_email',
+            'record_type', 'title', 'description', 'findings', 'recommendations',
+            'record_date', 'file_attachment', 'file_url', 'is_verified',
+            'created_at', 'updated_at'
+        ]
+        read_only_fields = ['id', 'doctor', 'patient', 'created_at', 'updated_at']
     
-    class Meta:
-        model = Prescription
-        fields = ['id', 'patient', 'doctor', 'doctor_name', 'prescription_date',
-                  'issue_date', 'expiry_date', 'notes', 'is_active', 'medications',
-                  'created_at', 'updated_at']
-        read_only_fields = ['created_at', 'updated_at', 'prescription_date']
-
-class PharmacyOrderSerializer(serializers.ModelSerializer):
-    pharmacist_name = serializers.CharField(source='pharmacist.get_full_name', read_only=True)
-    prescription_detail = PrescriptionSerializer(source='prescription', read_only=True)
+    def get_file_url(self, obj):
+        """Get the file URL if attachment exists"""
+        if obj.file_attachment:
+            request = self.context.get('request')
+            if request:
+                return request.build_absolute_uri(obj.file_attachment.url)
+            return obj.file_attachment.url
+        return None
     
-    class Meta:
-        model = PharmacyOrder
-        fields = ['id', 'prescription', 'prescription_detail', 'pharmacist',
-                  'pharmacist_name', 'status', 'prepared_date', 'completed_date',
-                  'total_cost', 'notes', 'created_at', 'updated_at']
-        read_only_fields = ['created_at', 'updated_at']
+    def validate_record_date(self, value):
+        """Validate record date is not in the future"""
+        from django.utils import timezone
+        from datetime import date
+        if value > timezone.now().date():
+            raise serializers.ValidationError("Record date cannot be in the future")
+        return value
