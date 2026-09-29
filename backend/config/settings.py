@@ -6,12 +6,17 @@ from decouple import config, Csv
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = config('SECRET_KEY', default='your-secret-key-change-this-in-production')
+SECRET_KEY = config('SECRET_KEY', default=None)
+if not SECRET_KEY:
+    raise ValueError(
+        'SECRET_KEY environment variable is required. '
+        'Generate one with: python -c "from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())"'
+    )
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = config('DEBUG', default=True, cast=bool)
+DEBUG = config('DEBUG', default=False, cast=bool)
 
-ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='localhost,127.0.0.1,0.0.0.0', cast=Csv())
+ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='localhost,127.0.0.1', cast=Csv())
 
 # Application definition
 INSTALLED_APPS = [
@@ -159,6 +164,27 @@ EMAIL_USE_TLS = True
 EMAIL_HOST_USER = config('SMTP_EMAIL', default='')
 EMAIL_HOST_PASSWORD = config('SMTP_PASSWORD', default='')
 DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL', default='noreply@e-hospital.com')
+
+# Security Settings
+# HTTPS and Cookies - disabled in development (DEBUG=True), enabled in production
+if not DEBUG:
+    SECURE_HSTS_SECONDS = config('SECURE_HSTS_SECONDS', default=31536000, cast=int)  # 1 year
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = True
+    SECURE_SSL_REDIRECT = True
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    CSRF_COOKIE_HTTPONLY = True
+    SECURE_BROWSER_XSS_FILTER = True
+    SECURE_CONTENT_SECURITY_POLICY = {
+        'default-src': ("'self'",),
+    }
+else:
+    # Development settings
+    SECURE_HSTS_SECONDS = 0
+    SECURE_SSL_REDIRECT = False
+    SESSION_COOKIE_SECURE = False
+    CSRF_COOKIE_SECURE = False
 
 # Logging Configuration
 LOGGING = {
