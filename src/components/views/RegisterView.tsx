@@ -27,20 +27,15 @@ import {
 } from '@/components/ui/select'
 import { Stethoscope, ArrowLeft, AlertCircle } from 'lucide-react'
 
-const registerSchema = z
-  .object({
-    first_name: z.string().min(2, 'First name is required'),
-    last_name: z.string().min(2, 'Last name is required'),
-    email: z.string().email('Invalid email address'),
-    username: z.string().min(3, 'Username must be at least 3 characters'),
-    password: z.string().min(6, 'Password must be at least 6 characters'),
-    password_confirm: z.string(),
-    role: z.string().min(1, 'Please select a role'),
-  })
-  .refine((data) => data.password === data.password_confirm, {
-    message: 'Passwords do not match',
-    path: ['password_confirm'],
-  })
+const registerSchema = z.object({
+  first_name: z.string().min(2, 'First name is required'),
+  last_name: z.string().min(2, 'Last name is required'),
+  email: z.string().email('Invalid email address'),
+  username: z.string().min(3, 'Username must be at least 3 characters'),
+  password: z.string().min(6, 'Password must be at least 6 characters'),
+  password_confirm: z.string().min(1, 'Please confirm your password'),
+  role: z.string().min(1, 'Please select a role'),
+})
 
 type RegisterFormData = z.infer<typeof registerSchema>
 
@@ -65,6 +60,14 @@ export default function RegisterView() {
   const onSubmit = async (data: RegisterFormData) => {
     setLoading(true)
     setError('')
+
+    // Manual password match check (avoids Zod v4 refine compatibility issue)
+    if (data.password !== data.password_confirm) {
+      setError('Passwords do not match')
+      setLoading(false)
+      return
+    }
+
     try {
       const { password_confirm, ...userData } = data
       const res = await api.post<{ token: string; user: any }>('/auth/register', userData)
