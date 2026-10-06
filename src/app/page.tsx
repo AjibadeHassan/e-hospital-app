@@ -4,6 +4,7 @@ import { useRouterStore } from '@/store/router'
 import { useAuthStore } from '@/store/auth'
 import AppHeader from '@/components/AppHeader'
 import AppFooter from '@/components/AppFooter'
+import { AIChat } from '@/components/AIChat'
 
 import LandingView from '@/components/views/LandingView'
 import LoginView from '@/components/views/LoginView'
@@ -92,6 +93,7 @@ export default function Home() {
       {showHeaderFooter && <AppHeader />}
       <main className="flex-1 flex flex-col">{renderView()}</main>
       {showHeaderFooter && <AppFooter />}
+      {isAuthenticated && <AIChat />}
     </div>
   )
 }

@@ -19,6 +19,7 @@ import {
   Clock,
   AlertCircle,
 } from 'lucide-react'
+import { TriageAssistant } from '@/components/TriageAssistant'
 
 interface Appointment {
   id: string
@@ -211,6 +212,11 @@ export default function DashboardView() {
             )
           })}
         </div>
+      </div>
+
+      {/* AI Symptom Triage */}
+      <div className="mb-8 max-w-2xl">
+        <TriageAssistant />
       </div>
 
       {/* Upcoming Appointments */}
