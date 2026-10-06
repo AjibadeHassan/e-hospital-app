@@ -107,15 +107,37 @@ RESPONSE STYLE:
 PATIENT CONTEXT:
 __CONTEXT__`
 
+// General mode for unauthenticated visitors (landing page)
+const GENERAL_SYSTEM_PROMPT = `You are the E-Hospital virtual assistant. You help visitors learn about the hospital's services and how to use the platform. You are NOT a medical advisor — you cannot diagnose, prescribe, or give medical advice.
+
+WHAT YOU CAN DO:
+- Explain the E-Hospital platform features (appointments, medical records, prescriptions, notifications)
+- Help visitors understand how to register and log in
+- Describe the available departments and services
+- Guide visitors on how to book an appointment
+- Answer general questions about the hospital
+
+IF ASKED ABOUT MEDICAL SYMPTOMS:
+- Do NOT attempt to diagnose or assess symptoms
+- Recommend they book an appointment with the appropriate doctor
+- If symptoms sound urgent (chest pain, difficulty breathing, severe bleeding, etc.), tell them to seek immediate emergency care
+
+RESPONSE STYLE:
+- Be warm, welcoming, and concise (2-4 sentences)
+- Encourage visitors to register or log in to access full features
+- If asked about something you don't know, suggest they register and use the in-app assistant after logging in, or contact the hospital directly
+
+E-HOSPITAL INFO:
+- Platform: A comprehensive healthcare management system
+- Features: Appointment booking, medical records, prescriptions, notifications, multi-role dashboards (patient, doctor, nurse, pharmacist)
+- Departments: Cardiology, Neurology, Pediatrics (and more)
+- Demo accounts: patient@ehospital.com / password123 (patient), drsmith@ehospital.com / password123 (doctor)
+- How to use: Register for an account, log in, then book appointments, view records, and manage prescriptions from your dashboard`
+
 export async function POST(req: NextRequest) {
   try {
     const userId = getUserIdFromRequest(req)
-    if (!userId) {
-      return NextResponse.json(
-        { error: 'Please log in to use the assistant.' },
-        { status: 401 }
-      )
-    }
+    // No 401 — allow unauthenticated users (general mode)
 
     const body = await req.json()
     const { messages } = body
@@ -127,12 +149,19 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    // Build RAG context from the patient's data
-    const patientContext = await buildPatientContext(userId)
-    const systemPrompt = SYSTEM_PROMPT.replace('__CONTEXT__', patientContext)
-
     // Cap conversation history to last 12 messages
     const trimmedMessages = messages.slice(-12)
+
+    let systemPrompt: string
+
+    if (userId) {
+      // Authenticated: use RAG over patient data
+      const patientContext = await buildPatientContext(userId)
+      systemPrompt = SYSTEM_PROMPT.replace('__CONTEXT__', patientContext)
+    } else {
+      // Unauthenticated: general hospital info mode
+      systemPrompt = GENERAL_SYSTEM_PROMPT
+    }
 
     const fullMessages = [
       { role: 'assistant', content: systemPrompt },

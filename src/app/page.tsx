@@ -93,7 +93,7 @@ export default function Home() {
       {showHeaderFooter && <AppHeader />}
       <main className="flex-1 flex flex-col">{renderView()}</main>
       {showHeaderFooter && <AppFooter />}
-      {isAuthenticated && <AIChat />}
+      <AIChat />
     </div>
   )
 }

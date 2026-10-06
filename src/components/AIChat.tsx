@@ -14,33 +14,58 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import api from '@/lib/api'
+import { useAuthStore } from '@/store/auth'
 
 interface Message {
   role: 'user' | 'assistant'
   content: string
 }
 
-const QUICK_SUGGESTIONS = [
+// Patient-specific suggestions (authenticated)
+const PATIENT_SUGGESTIONS = [
   'When is my next appointment?',
   'What medications am I taking?',
   'Summarize my latest lab results',
   'What did my doctor recommend?',
 ]
 
-const WELCOME_MESSAGE: Message = {
+// General suggestions (unauthenticated visitors)
+const VISITOR_SUGGESTIONS = [
+  'What services does E-Hospital offer?',
+  'How do I register?',
+  'What departments are available?',
+  'How do I book an appointment?',
+]
+
+const PATIENT_WELCOME: Message = {
   role: 'assistant',
   content:
     "Hi! I'm your healthcare assistant. I can help you understand your appointments, prescriptions, and medical records. How can I help you today?",
 }
 
+const VISITOR_WELCOME: Message = {
+  role: 'assistant',
+  content:
+    "Welcome to E-Hospital! I'm the virtual assistant. I can help you learn about our services, how to register, and how to book an appointment. How can I help you today?",
+}
+
 export function AIChat() {
+  const { isAuthenticated } = useAuthStore()
+  const welcomeMessage = isAuthenticated ? PATIENT_WELCOME : VISITOR_WELCOME
+  const quickSuggestions = isAuthenticated ? PATIENT_SUGGESTIONS : VISITOR_SUGGESTIONS
+
   const [open, setOpen] = useState(false)
-  const [messages, setMessages] = useState<Message[]>([WELCOME_MESSAGE])
+  const [messages, setMessages] = useState<Message[]>([welcomeMessage])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const scrollRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+
+  // Reset conversation when auth state changes (e.g., login/logout)
+  useEffect(() => {
+    setMessages([isAuthenticated ? PATIENT_WELCOME : VISITOR_WELCOME])
+  }, [isAuthenticated])
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -68,7 +93,7 @@ export function AIChat() {
     try {
       const data = await api.post<{ response: string }>('/chat', {
         messages: newMessages
-          .filter((m) => m !== WELCOME_MESSAGE)
+          .filter((m) => m !== (isAuthenticated ? PATIENT_WELCOME : VISITOR_WELCOME))
           .map((m) => ({ role: m.role, content: m.content })),
       })
 
@@ -96,7 +121,7 @@ export function AIChat() {
   }
 
   const handleReset = () => {
-    setMessages([WELCOME_MESSAGE])
+    setMessages([isAuthenticated ? PATIENT_WELCOME : VISITOR_WELCOME])
     setError('')
   }
 
@@ -150,7 +175,9 @@ export function AIChat() {
                 </div>
                 <div>
                   <p className="text-sm font-semibold leading-tight">Healthcare Assistant</p>
-                  <p className="text-xs text-white/80 leading-tight">Ask about your records</p>
+                  <p className="text-xs text-white/80 leading-tight">
+                    {isAuthenticated ? 'Ask about your records' : 'Ask about our services'}
+                  </p>
                 </div>
               </div>
               <button onClick={handleReset} className="rounded-md px-2 py-1 text-xs text-white/80 hover:bg-white/10 hover:text-white transition-colors" title="Reset conversation">
@@ -203,7 +230,7 @@ export function AIChat() {
             {/* Quick suggestions (only on welcome) */}
             {messages.length === 1 && !loading && (
               <div className="flex flex-wrap gap-2 px-4 pb-2 bg-muted/20">
-                {QUICK_SUGGESTIONS.map((suggestion) => (
+                {quickSuggestions.map((suggestion) => (
                   <button key={suggestion} onClick={() => sendMessage(suggestion)} className="rounded-full border border-border bg-background px-3 py-1.5 text-xs font-medium text-muted-foreground hover:border-emerald-500 hover:text-emerald-500 transition-colors">
                     {suggestion}
                   </button>
