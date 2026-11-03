@@ -54,7 +54,7 @@ export default function ForgotPasswordView() {
   }
 
   return (
-    <div className="flex-1 flex items-center justify-center bg-gradient-to-br from-emerald-50 via-background to-teal-50 px-4 py-12">
+    <div className="relative flex-1 flex items-center justify-center px-4 py-12 overflow-hidden"><div className="absolute inset-0 z-0"><img src="/hospital-bg.jpg" alt="Medical facility" className="h-full w-full object-cover" /><div className="absolute inset-0 bg-gradient-to-br from-emerald-950/80 via-teal-950/70 to-slate-950/80" /></div><div className="relative z-10 w-full max-w-md">
       <div className="w-full max-w-md">
         <button
           onClick={() => navigate('login')}
@@ -64,7 +64,7 @@ export default function ForgotPasswordView() {
           Back to login
         </button>
 
-        <Card className="border-0 shadow-lg">
+        <Card className="border border-white/20 shadow-2xl bg-background/90 backdrop-blur-xl">
           <CardHeader className="text-center space-y-3">
             <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-xl bg-emerald-600">
               <Stethoscope className="h-7 w-7 text-white" />
@@ -129,6 +129,7 @@ export default function ForgotPasswordView() {
           </CardContent>
         </Card>
       </div>
+    </div>
     </div>
   )
 }
